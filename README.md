@@ -7,8 +7,9 @@ and put them into a Postgres DB for querying.
 RQL is kind of slow :(
 
 ## Installation
-```
+```bash
 $ virutalenv venv
+$ source venv/bin/activate
 $ pip install -r requirements.txt
 ```
 
