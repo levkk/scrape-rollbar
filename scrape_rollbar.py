@@ -8,6 +8,7 @@ import sys
 import os
 import subprocess
 import math
+import argparse
 
 __author__ = 'Lev Kokotov <lev.kokotov@instacart.com>'
 __version__ = 0.1
@@ -73,6 +74,14 @@ def setup_db(backup=False):
     if backup:
         backup_dir = os.environ.get('PG_DUMP_BACKUP_DIR', DEFAULT_PG_DUMP_BACKUP_DIR)
         __execute(f'pg_dump {dbname} -f {backup_dir}/{dbname}.sql')
+
+    # Create database (if not exists)
+    try:
+        print(f'Creating dabase "{__dbname()}"...')
+        __execute('createdb rollbars')
+    except:
+        print(f'Database "{__dbname()}" already exists.')
+
 
     cursor.execute('''
         DROP TABLE IF EXISTS rollbars;
@@ -191,16 +200,30 @@ def main(counter, num_rollbars):
         print('Fetching rollbars...')
         for _ in tqdm.tqdm(pool.imap_unordered(get, range(1, pages)), total=pages - 1): # Page count starts at 1
             pass
-        print(f'Done. The rollbars are now available in the "{__dbname()}" database.')
-        print(f'Connect and query it using psql: $ psql {__dbname()}')
+
+    # Prepare table for querying
+    cursor, conn = psql()
+
+    print('Running "ANALYZE rollbars;" to optimize for querying...')
+    cursor.execute('ANALYZE rollbars;')
+    conn.close()
+
+    print(f'Done. The rollbars are now available in the "{__dbname()}" database.')
+    print(f'Connect and query it using psql: $ psql {__dbname()}')
 
 # Go!
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print('Usage:\n\nROLLBAR_TOKEN=<token> ./scrape_rollbar.py <counter> <number of rollbars to fetch>\n')
-        exit(1)
+    parser = argparse.ArgumentParser(description='Rollbar scraper and Postgres importer.')
 
-    counter = sys.argv[1]
-    num_rollbars = int(sys.argv[2])
+    parser.add_argument('counter', type=int, help='The Rollbar counter in your Rollbar project.')
+    parser.add_argument('num_rollbars', type=int, help='The quantity of Rollbars to import.')
 
-    main(counter, num_rollbars)
+    args = parser.parse_args()
+    # if len(sys.argv) < 3:
+    #     print('Usage:\n\nROLLBAR_TOKEN=<token> ./scrape_rollbar.py <counter> <number of rollbars to fetch>\n')
+    #     exit(1)
+
+    # counter = sys.argv[1]
+    # num_rollbars = int(sys.argv[2])
+
+    main(args.counter, args.num_rollbars)
