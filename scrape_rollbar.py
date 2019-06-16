@@ -2,6 +2,7 @@
 
 import requests
 import psycopg2
+import tqdm
 import multiprocessing
 import sys
 import os
@@ -185,9 +186,13 @@ def main(counter, num_rollbars):
     setup_rollbar_id(counter)
 
     with multiprocessing.Pool(20) as pool:
-        pages = math.ceil(num_rollbars / 20) # Rollbar returns pages of 20 items.
-        pool.map(get, range(1, pages + 1)) # Page count starts at 1
+        pages = math.ceil(num_rollbars / 20) + 1 # Rollbar returns pages of 20 items.
 
+        print('Fetching rollbars...')
+        for _ in tqdm.tqdm(pool.imap_unordered(get, range(1, pages)), total=pages - 1): # Page count starts at 1
+            pass
+        print(f'Done. The rollbars are now available in the "{__dbname()}" database.')
+        print(f'Connect and query it using psql: $ psql {__dbname()}')
 
 # Go!
 if __name__ == '__main__':
