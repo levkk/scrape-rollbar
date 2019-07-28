@@ -9,14 +9,17 @@ import os
 import subprocess
 import math
 import argparse
+from dotenv import load_dotenv
 
 __author__ = 'Lev Kokotov <lev.kokotov@instacart.com>'
 __version__ = 0.1
 
+load_dotenv()
+
 DEFAULT_PG_DUMP_BACKUP_DIR = os.path.join(os.environ.get('HOME'), 'Desktop')
 DEFAULT_POSTGRES_DB = 'rollbars'
 DEFAULT_POSTGRES_HOST = '127.0.0.1'
-DEBUG = os.environ.get('DEBUG', False)
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 def __execute(cmd):
     '''Execute a command on the system.
@@ -32,7 +35,7 @@ def __execute(cmd):
 
 def __unix_user():
     '''Get the current unix user.'''
-    return __execute('whoami').replace(b"\n", b'').decode('utf-8')
+    return __execute('whoami').decode('utf-8').strip()
 
 
 def __dbname():
@@ -115,23 +118,19 @@ def insert(rollbar, cursor):
     timestamp = rollbar['timestamp']
     environment = rollbar['data']['environment']
     level = rollbar['data']['level']
-    status_code = rollbar['data']['body']['message']['extra']['status_code']
-    request_path = rollbar['data']['body']['message']['extra']['request_path']
-    try:
-        error_message = rollbar['data']['body']['message']['extra']['error_message']
-    except:
-        error_message = ''
+    message = rollbar['data']['body'].get('message', {})
+    extra = message.get('extra', {})
+    status_code = extra.get('status_code', '')
+    request_path = extra.get('request_path', '')
+    error_message = extra.get('error_message', '')
 
     try:
         # I trust inputs from Rollbar so I won't escape them.
-        cursor.execute(f"""
+        cursor.execute(f'''
             INSERT INTO rollbars
             (id, project_id, environment, request_path, status_code, "timestamp", level)
-            VALUES (
-                {id_}, {project_id}, '{environment}', '{request_path}',
-                '{status_code}', {timestamp}, '{level}'
-            );
-        """)
+            VALUES (%s, %s, %s, %s, %s, %s, %s);
+        ''', (id_, project_id, environment, request_path, status_code, timestamp, level))
     except psycopg2.errors.UniqueViolation:
         # Skip duplicates
         pass
@@ -155,6 +154,7 @@ def get(page: int):
             insert(rollbar, cursor)
         conn.commit()
     except Exception as e:
+        raise e
         print(f'Failed to fetch Rollbars: {e}')
         print(f'Page {page}')
         conn.rollback()
@@ -171,13 +171,20 @@ def psql():
     dbname = __dbname()
     user = os.environ.get('POSTGRES_USER', __unix_user())
     host = os.environ.get('POSTGRES_HOST', DEFAULT_POSTGRES_HOST)
+    password = os.environ.get('POSTGRES_PASSWORD', False)
 
     conn_string = f'host={host} dbname={dbname} user={user}'
+
+    # If password is provided/required, let's not log it to stdout
+    if password:
+        conn_string_secure = conn_string + f' password={password}'
+    else:
+        conn_string_secure = conn_string
 
     if DEBUG:
         print(f'Connecting to {conn_string}')
 
-    conn = psycopg2.connect(conn_string)
+    conn = psycopg2.connect(conn_string_secure)
     cursor = conn.cursor()
 
     return cursor, conn
