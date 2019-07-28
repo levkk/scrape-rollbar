@@ -226,11 +226,5 @@ if __name__ == '__main__':
     parser.add_argument('num_rollbars', type=int, help='The quantity of Rollbars to import.')
 
     args = parser.parse_args()
-    # if len(sys.argv) < 3:
-    #     print('Usage:\n\nROLLBAR_TOKEN=<token> ./scrape_rollbar.py <counter> <number of rollbars to fetch>\n')
-    #     exit(1)
-
-    # counter = sys.argv[1]
-    # num_rollbars = int(sys.argv[2])
 
     main(args.counter, args.num_rollbars)
