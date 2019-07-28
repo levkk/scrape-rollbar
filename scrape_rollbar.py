@@ -65,9 +65,6 @@ def setup_db(backup=False):
     '''Setup the database from scratch.
     
     Arguments:
-        - cursor: psycopg2 cursor
-        - conn: psycopg2 connection
-        - db_name: str, name of the database
         - backup: boolean, backup or not to backup existing DB
     '''
     cursor, conn = psql()
